@@ -196,6 +196,8 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     
     @Input() optionLabel: string;
 
+    @Input() optionValue: string;
+
     @Input() autoDisplayFirst: boolean = true;
 
     @Input() group: boolean;
@@ -372,7 +374,7 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     }
 
     set options(val: any[]) {
-        let opts = this.optionLabel ? ObjectUtils.generateSelectItems(val, this.optionLabel) : val;
+        let opts = (this.optionLabel || this.optionValue) ? ObjectUtils.generateSelectItems(val, this.optionLabel, this.optionValue) : val;
         this._options = opts;
         this.optionsToDisplay = this._options;
         this.updateSelectedOption(this.value);
