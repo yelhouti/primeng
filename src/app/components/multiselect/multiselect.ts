@@ -205,12 +205,14 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     @Input() showToggleAll: boolean = true;
     
     @Input() emptyFilterMessage: string = 'No results found';
-    
+
     @Input() resetFilterOnHide: boolean = false;
     
     @Input() dropdownIcon: string = 'pi pi-chevron-down';
     
     @Input() optionLabel: string;
+
+    @Input() optionValue: string;
 
     @Input() showHeader: boolean = true;
 
@@ -301,7 +303,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     }
 
     set options(val: any[]) {
-        let opts = this.optionLabel ? ObjectUtils.generateSelectItems(val, this.optionLabel) : val;
+        let opts = (this.optionLabel || this.optionValue) ? ObjectUtils.generateSelectItems(val, this.optionLabel, this.optionValue) : val;
         this.visibleOptions = opts;
         this._options = opts;
         this.updateLabel();
