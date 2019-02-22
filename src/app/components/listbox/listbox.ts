@@ -87,6 +87,8 @@ export class Listbox implements AfterContentInit, ControlValueAccessor {
 
     @Input() optionLabel: string;
 
+    @Input() optionValue: string;
+
     @Input() ariaFilterLabel: string;
 
     @Output() onChange: EventEmitter<any> = new EventEmitter();
@@ -132,7 +134,7 @@ export class Listbox implements AfterContentInit, ControlValueAccessor {
     }
 
     set options(val: any[]) {
-        let opts = this.optionLabel ? ObjectUtils.generateSelectItems(val, this.optionLabel) : val;
+        let opts = (this.optionLabel || this.optionValue) ? ObjectUtils.generateSelectItems(val, this.optionLabel, this.optionValue) : val;
         this._options = opts;
     }
     
