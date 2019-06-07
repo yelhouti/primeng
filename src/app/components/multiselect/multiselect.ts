@@ -411,7 +411,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
         const optionValue = option.value;
         let selectionIndex = this.findSelectionIndex(optionValue);
         //TODO document how labelIndex and _selectedLabels work
-        const labelIndex = selectionIndex + this._selectedLabels.length - this.value.length;
+        const labelIndex = selectionIndex + this._selectedLabels.length - (this.value ? this.value.length : 0);
         if (selectionIndex != -1) {
             this.value = this.value.filter((val,i) => i != selectionIndex);
             this._selectedLabels = this._selectedLabels.filter((val,i) => i != labelIndex);
@@ -551,11 +551,11 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     }
     
     show() {
-        if(this.lazy && !this.options || !this.options.length) {
-            this.lazyLoad(0);
-        }
         if (!this.overlayVisible){
             this.overlayVisible = true;
+        }
+        if(this.lazy && !(this.options && this.options.length)) {
+            this.lazyLoad(0);
         }
     
         if (this.filter) {
