@@ -253,6 +253,8 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     @ViewChild(CdkVirtualScrollViewport, {static:false}) viewPort: CdkVirtualScrollViewport;
 
     @ViewChild('editableInput', { static: false }) editableInputViewChild: ElementRef;
+
+    @ViewChild('viewport', { static: false }) viewport: CdkVirtualScrollViewport;
     
     @ContentChildren(PrimeTemplate) templates: QueryList<any>;
 
