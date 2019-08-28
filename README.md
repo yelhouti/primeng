@@ -4,6 +4,26 @@
 [![npm version](https://badge.fury.io/js/primeng.svg)](https://badge.fury.io/js/primeng)
 [![Build Status](https://travis-ci.org/primefaces/primeng.svg?branch=master)](https://travis-ci.org/primefaces/primeng)
 
+#This Fork
+this fork fixes issues primeng team didn't have the time to fix yet and implement features they don't have time to implement and are not willing to accept PRs for due to company policy:
+
+**Bug fixes:**
+- ~~branch: `fix-7758` https://github.com/primefaces/primeng/issues/7758 `Calendar` should be able to read date from array of strings fixes~~ fixes has few problems ignoring for now
+- ~~branch: `fix-7901` https://github.com/primefaces/primeng/issues/7901 `FileUpload` initial files preview is not working~~ fixed in 8.0.2
+
+**Features:**
+- ~~branch: `optionValue` much requested feature that add the Ability to define optionValue in components like Dropdown~~ merged in branch selectLazy
+- branch: `selectLazy` added feature Lazy loading for filter options in dropdown, multiselect (+ branch `optionValue`)
+- branch: `fix-8091` https://github.com/primefaces/primeng/issues/8091 `Table` onEditComplete/Cancel prevents default but doesn't emit the event with data
+
+From time to time, all the NOT ~~crossed~~ branches are rebased on top of ~~origin~~ upstream master then force pushed to be up to date with latest primeng features (we rebase on top of upstream instead of origin in order to not include this readme and be able to pull request hopping for primeng to accept minor changes)
+
+Branch `all-fixes` is then reset to origin/master state and all of them a re merged
+
+Once this is done, primeng is packaged and uploaded to https://github.com/yelhouti/primeng/releases
+
+Version matches original primeng version without the fixes
+
 # PrimeNG
 
 UI Components for Angular
