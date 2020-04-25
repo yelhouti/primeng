@@ -1,6 +1,7 @@
 import {Component} from '@angular/core';
 import {CountryService} from '../../service/countryservice';
-import {SelectItemGroup} from 'primeng/api';
+import {LazyLoadEvent, SelectItem, SelectItemGroup} from 'primeng/api';
+import {Observable, of} from 'rxjs';
 
 interface City {
     name: string,
@@ -37,6 +38,14 @@ export class MultiSelectDemo {
     countries: City[];
 
     virtualCountries: Country[];
+
+    items: SelectItem[];
+
+    lazyItems: SelectItem[];
+
+    selectedItems: string[];
+
+    lazySelectedOptions: SelectItem[];
 
     constructor(private countryService: CountryService) {
         this.cities = [
@@ -93,5 +102,33 @@ export class MultiSelectDemo {
         this.countryService.getCountries().then(countries => {
             this.virtualCountries = countries;
         });
+
+        this.items = [];
+        for (let i = 0; i < 10000; i++) {
+            this.items.push({label: 'Label ' + i, value: 'Value ' + i});
+        }
+        this.items[200].disabled = true;
+        this.selectedItems = [this.items[100].value, this.items[200].value, this.items[300].value];
+        this.lazySelectedOptions = [this.items[200], this.items[300]];
+    }
+
+    onLazyLoadEvent(event: LazyLoadEvent) {
+        this.loadBatch(event).subscribe(res => {
+            this.lazyItems = res;
+        });
+    }
+
+    loadBatch(event: LazyLoadEvent): Observable<SelectItem[]> {
+        // simulate server response
+        const res = [];
+        for (let i = 0; i < this.items.length; i++) {
+            if (!event.globalFilter || (event.globalFilter && this.items[i].label.includes(event.globalFilter))) {
+                res.push({...this.items[i]});
+            }
+            if (event.rows === res.length) {
+                break;
+            }
+        }
+        return of(res);
     }
 }

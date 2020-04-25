@@ -259,6 +259,12 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
     @Input() ariaFilterLabel: string;
 
+    @Input() lazy: boolean;
+
+    @Input() lazyLoadOnInit: boolean = false;
+
+    @Input() rows: number;
+
     @Input() filterMatchMode: string = "contains";
 
     @Input() tooltip: string = '';
@@ -299,6 +305,10 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
     @Output() onPanelHide: EventEmitter<any> = new EventEmitter();
 
+    @Output() onLazyLoad: EventEmitter<any> = new EventEmitter();
+
+    @Output() onLabelsNotFound: EventEmitter<any> = new EventEmitter();
+
     @Input() scrollHeight: string = '200px';
 
     _defaultLabel: string;
@@ -329,6 +339,14 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
     set options(val: any[]) {
         this._options = val;
+        // if (this.lazy && this.value && this.value.length !== this._lazySelectedOptions.length) {
+            this.updateLabel();
+        // }
+    }
+
+    @Input() set lazySelectedOptions(val: any[]) {
+        this._lazySelectedOptions = val || [];
+        this.updateLabel();
     }
 
     @Input() get filterValue(): string {
@@ -376,6 +394,9 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
     _options: any[];
 
+    // this is used when the lazy to keep a reference of the option when it is not present anymore in the list of options (to compute the label...)
+    _lazySelectedOptions: any[] = [];
+
     maxSelectionLimitReached: boolean;
 
     scrollHandler: any;
@@ -388,6 +409,11 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
     ngOnInit() {
         this.updateLabel();
+        if(this.lazyLoadOnInit){
+            setTimeout(() => {
+                this.filterValue && this.lazyLoad();
+            }, 100)
+        }
     }
 
     ngAfterContentInit() {
@@ -539,6 +565,9 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     }
 
     get toggleAllDisabled(): boolean {
+        if (this.lazy && this.value?.length) {
+            return false;
+        }
         let optionsToRender = this.optionsToRender;
         if (!optionsToRender || optionsToRender.length === 0) {
             return true;
@@ -557,16 +586,16 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
         if (this.disabled || this.toggleAllDisabled || this.readonly) {
             return;
         }
-        
-        let allChecked = this.allChecked;     
 
-        if (allChecked)
+        let allChecked = this.allChecked;
+
+        if (allChecked || this.lazy)
             this.uncheckAll();
         else
             this.checkAll();
 
         this.onModelChange(this.value);
-        this.onChange.emit({ originalEvent: event, value: this.value });        
+        this.onChange.emit({ originalEvent: event, value: this.value });
         this.updateFilledState();
         this.updateLabel();
         event.preventDefault();
@@ -578,7 +607,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
         optionsToRender.forEach(opt => {
             if (!this.group) {
-                let optionDisabled = this.isOptionDisabled(opt); 
+                let optionDisabled = this.isOptionDisabled(opt);
                 if (!optionDisabled || (optionDisabled && this.isSelected(opt))) {
                     val.push(this.getOptionValue(opt));
                 }
@@ -588,7 +617,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
                 if (subOptions) {
                     subOptions.forEach(option => {
-                        let optionDisabled = this.isOptionDisabled(option); 
+                        let optionDisabled = this.isOptionDisabled(option);
                         if (!optionDisabled || (optionDisabled && this.isSelected(option))) {
                             val.push(this.getOptionValue(option));
                         }
@@ -601,12 +630,12 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     }
 
     uncheckAll() {
-        let optionsToRender = this.optionsToRender;
+        let optionsToRender = this.optionsToRender || [];
         let val: any[] = [];
 
-        optionsToRender.forEach(opt => {
+        [...optionsToRender, ...this._lazySelectedOptions].forEach(opt => {
             if (!this.group) {
-                let optionDisabled = this.isOptionDisabled(opt); 
+                let optionDisabled = this.isOptionDisabled(opt);
                 if (optionDisabled && this.isSelected(opt)) {
                     val.push(this.getOptionValue(opt));
                 }
@@ -614,7 +643,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
             else {
                 if (opt.items) {
                     opt.items.forEach(option => {
-                        let optionDisabled = this.isOptionDisabled(option); 
+                        let optionDisabled = this.isOptionDisabled(option);
                         if (optionDisabled && this.isSelected(option)) {
                             val.push(this.getOptionValue(option));
                         }
@@ -837,8 +866,9 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     }
 
     updateLabel() {
-        if (this.value && this.options && this.value.length && this.displaySelectedLabel) {
+        if (this.value && (this.options || this.lazy) && this.value.length && this.displaySelectedLabel) {
             let label = '';
+            let labelNotFound = false;
             for (let i = 0; i < this.value.length; i++) {
                 let itemLabel = this.findLabelByValue(this.value[i]);
                 if (itemLabel) {
@@ -846,10 +876,13 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
                         label = label + ', ';
                     }
                     label = label + itemLabel;
+                } else if (this.lazy) {
+                    labelNotFound = true;
+                    break;
                 }
             }
 
-            if (this.value.length <= this.maxSelectedLabels || this.selectedItemsLabel === 'ellipsis') {
+            if (this.value.length <= this.maxSelectedLabels && !labelNotFound) {
                 this.valuesAsString = label;
             }
             else {
@@ -882,7 +915,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
             }
 
             return label;
-        }
+            }
         else {
             return this.searchLabelByValue(val, this.options)
         }
@@ -890,6 +923,9 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
     searchLabelByValue(val: any, options: any[]): string {
         let label = null;
+        if (this.lazy) {
+            options = [...(options || []), ...this._lazySelectedOptions];
+        }
 
         for (let i = 0; i < options.length; i++) {
             let option = options[i];
@@ -897,6 +933,9 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
             if (val == null && optionValue == null || ObjectUtils.equals(val, optionValue, this.dataKey)) {
                 label = this.getOptionLabel(option);
+                if (this.lazy && !this._lazySelectedOptions.some(o => ObjectUtils.equals(this.getOptionValue(option), this.getOptionValue(o), this.dataKey))) {
+                    this._lazySelectedOptions.push(option);
+                }
                 break;
             }
         }
@@ -914,16 +953,16 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
             let unselectedDisabledItemsLength = 0;
             let selectedEnabledItemsLength = 0;
             let visibleOptionsLength = this.group ? 0 : this.optionsToRender.length;
-            
+
             for (let option of optionsToRender) {
                 if (!this.group) {
                     let disabled = this.isOptionDisabled(option);
                     let selected = this.isSelected(option);
-    
+
                     if (disabled) {
                         if (selected)
                             selectedDisabledItemsLength++;
-                        else 
+                        else
                             unselectedDisabledItemsLength++;
                     }
                     else {
@@ -937,11 +976,11 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
                     for (let opt of this.getOptionGroupChildren(option)) {
                         let disabled = this.isOptionDisabled(opt);
                         let selected = this.isSelected(opt);
-        
+
                         if (disabled) {
                             if (selected)
                                 selectedDisabledItemsLength++;
-                            else 
+                            else
                                 unselectedDisabledItemsLength++;
                         }
                         else {
@@ -957,8 +996,8 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
                 }
             }
 
-            return (visibleOptionsLength === selectedDisabledItemsLength 
-                    || visibleOptionsLength === selectedEnabledItemsLength 
+            return (visibleOptionsLength === selectedDisabledItemsLength
+                    || visibleOptionsLength === selectedEnabledItemsLength
                     || selectedEnabledItemsLength && visibleOptionsLength === (selectedEnabledItemsLength + unselectedDisabledItemsLength + selectedDisabledItemsLength));
         }
     }
@@ -973,7 +1012,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     }
 
     hasFilter() {
-        return this._filterValue && this._filterValue.trim().length > 0; 
+        return this._filterValue && this._filterValue.trim().length > 0;
     }
 
     onFilterInputChange(event: KeyboardEvent) {
@@ -983,7 +1022,9 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
     }
 
     activateFilter() {
-        if (this.hasFilter() && this._options) {
+        if (this.lazy) {
+            this.lazyLoad();
+        } else if (this.hasFilter() && this._options) {
             let searchFields: string[] = (this.filterBy || this.optionLabel || 'label').split(',');
             if (this.group) {
                 let searchFields: string[] = (this.optionLabel || 'label').split(',');
@@ -999,7 +1040,7 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
                 this._filteredOptions = filteredGroups;
             }
             else {
-                this._filteredOptions = this.filterService.filter(this.options, searchFields, this._filterValue, this.filterMatchMode, this.filterLocale);        
+                this._filteredOptions = this.filterService.filter(this.options, searchFields, this._filterValue, this.filterMatchMode, this.filterLocale);
             }
         }
         else {
@@ -1013,6 +1054,14 @@ export class MultiSelect implements OnInit,AfterViewInit,AfterContentInit,AfterV
 
     onHeaderCheckboxBlur() {
         this.headerCheckboxFocus = false;
+    }
+
+    lazyLoad() {
+        this.onLazyLoad.emit({
+            first: 0,
+            rows: this.rows,
+            globalFilter: this.filterValue,
+        });
     }
 
     bindDocumentClickListener() {
