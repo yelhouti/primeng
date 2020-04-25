@@ -12,6 +12,7 @@ import { Injectable } from '@angular/core';
 import { BlockableUI } from 'primeng/api';
 import { Subject, Subscription } from 'rxjs';
 import { FilterUtils } from 'primeng/utils';
+import { delay } from 'rxjs/operators';
 
 @Injectable()
 export class TableService {
@@ -281,6 +282,8 @@ export class Table implements OnInit, AfterViewInit, AfterContentInit, Blockable
     @ViewChild('reorderIndicatorDown') reorderIndicatorDownViewChild: ElementRef;
 
     @ViewChild('table') tableViewChild: ElementRef;
+
+    _rowsCheckboxes: TableCheckbox[] = [];
 
     @ContentChildren(PrimeTemplate) templates: QueryList<PrimeTemplate>;
 
@@ -1177,7 +1180,9 @@ export class Table implements OnInit, AfterViewInit, AfterContentInit, Blockable
     }
 
     toggleRowsWithCheckbox(event: Event, check: boolean) {
-        this._selection = check ? this.filteredValue ? this.filteredValue.slice(): this.value.slice() : [];
+        this._selection = check ?
+            this._rowsCheckboxes.filter(checkbox => !checkbox.disabled || checkbox.checked).map(checkbox => checkbox.value) :
+            this._rowsCheckboxes.filter(checkbox => checkbox.disabled && checkbox.checked).map(checkbox => checkbox.value);
         this.preventSelectionSetterPropagation = true;
         this.updateSelectionKeys();
         this.selectionChange.emit(this._selection);
@@ -3524,6 +3529,7 @@ export class TableCheckbox  {
 
     ngOnInit() {
         this.checked = this.dt.isSelected(this.value);
+        this.dt._rowsCheckboxes.push(this);
     }
 
     onClick(event: Event) {
@@ -3548,6 +3554,7 @@ export class TableCheckbox  {
         if (this.subscription) {
             this.subscription.unsubscribe();
         }
+        this.dt._rowsCheckboxes = this.dt._rowsCheckboxes.filter(checkbox => checkbox !== this);
     }
 
 }
@@ -3590,7 +3597,10 @@ export class TableHeaderCheckbox  {
             this.checked = this.updateCheckedState();
         });
 
-        this.selectionChangeSubscription = this.dt.tableService.selectionSource$.subscribe(() => {
+        this.selectionChangeSubscription = this.dt.tableService.selectionSource$
+            // wait for checkboxes to get updated before calculating own
+            .pipe(delay(10))
+            .subscribe(() => {
             this.checked = this.updateCheckedState();
         });
     }
@@ -3632,28 +3642,11 @@ export class TableHeaderCheckbox  {
     }
 
     updateCheckedState() {
-        if (this.dt.filteredValue) {
-            const val = this.dt.filteredValue;
-            return (val && val.length > 0 && this.dt.selection && this.dt.selection.length > 0 && this.isAllFilteredValuesChecked());
-        }
-        else {
-            const val = this.dt.value;
-            return (val && val.length > 0 && this.dt.selection && this.dt.selection.length > 0 && this.dt.selection.length === val.length);
-        }
+        return this.isAllFilteredValuesChecked();
     }
 
     isAllFilteredValuesChecked() {
-        if (!this.dt.filteredValue) {
-            return false;
-        }
-        else {
-            for (let rowData of this.dt.filteredValue) {
-                if (!this.dt.isSelected(rowData)) {
-                    return false;
-                }
-            }
-            return true;
-        }
+        return this.dt._rowsCheckboxes.length && this.dt._rowsCheckboxes.every(checkbox => checkbox.checked || checkbox.disabled);
     }
 
 }
