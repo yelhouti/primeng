@@ -117,7 +117,7 @@ export class DropdownItem {
                                 </cdk-virtual-scroll-viewport>
                             </ng-template>
                         </ng-template>
-                        <li *ngIf="filter && (!optionsToDisplay || (optionsToDisplay && optionsToDisplay.length === 0))" class="p-dropdown-empty-message">{{emptyFilterMessage}}</li>
+                        <li *ngIf="filter && (!lazy || filterValue) && (!optionsToDisplay || (optionsToDisplay && optionsToDisplay.length === 0))" class="p-dropdown-empty-message">{{emptyFilterMessage}}</li>
                     </ul>
                 </div>
             </div>
@@ -237,6 +237,12 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
 
     @Input() autofocusFilter: boolean = true;
 
+    @Input() lazy: boolean;
+
+    @Input() lazyLoadOnInit: boolean = true;
+
+    @Input() rows: number;
+
     @Output() onChange: EventEmitter<any> = new EventEmitter();
 
     @Output() onFocus: EventEmitter<any> = new EventEmitter();
@@ -248,6 +254,8 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     @Output() onShow: EventEmitter<any> = new EventEmitter();
 
     @Output() onHide: EventEmitter<any> = new EventEmitter();
+
+    @Output() onLazyLoad: EventEmitter<any> = new EventEmitter();
 
     @ViewChild('container') containerViewChild: ElementRef;
 
@@ -370,6 +378,11 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     ngOnInit() {
         this.optionsToDisplay = this.options;
         this.updateSelectedOption(null);
+        if(this.lazyLoadOnInit){
+            setTimeout(() => {
+                    this.filterValue && this.lazyLoad();
+                }, 100)
+        }
     }
 
     @Input() get options(): any[] {
@@ -383,7 +396,7 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
         this.optionsChanged = true;
         this.updateFilledState();
 
-        if (this._filterValue && this._filterValue.length) {
+        if (!this.lazy && this._filterValue && this._filterValue.length) {
             this.activateFilter();
         }
     }
@@ -501,10 +514,24 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     }
 
     writeValue(value: any): void {
-        if (this.filter) {
-            this.resetFilter();
-        }
+        // due to this bug: https://github.com/angular/angular/issues/14988 writeValue is called with null on initialization, after initializing all inputs
+        // I want to detect when this done because of init, and when it's the user trying to nullify the value programmatically (ngModel change)
+        // This problematic because when we start with an initial value, and lazy = true, if I use inputs to set the selectedOption.label...
+        // writeValue comes and clears it because I can't distinguish it from a genuine writeValue(null)
+        // we still need a mechanism that remembers the label associated with the value use when initializing
+        // we can't use a cache of label:value since we won't be able to detect when it should be cleared "new completely different of options vs lazy update"
+        // + it won't work great with filters (even though we can avoid caching when filters are active)
+        // we still can use cache if we provide the user with a way to invalidate it but it's not very clean.
+        // since there is no clean way to provide the label as separate input, we need to tell the user to make sure to provide the selectedOption in the list of options
+        // or to set a filterValue and lazyLoadOnInit so that the array contains the value
+        // or else configurable message "example 'selected' appear".
 
+        // we comment this code, since we don't want to remove the filter when setting the value onInit
+        // this allows to lazyLoad filtered data and show the selected item
+        // if we want this behavior backup use the variable resetFilterOnHide
+        // if (this.filter) {
+        //     this.resetFilter();
+        // }
         this.value = value;
         this.updateSelectedOption(value);
         this.updateEditableLabel();
@@ -523,7 +550,19 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     }
 
     updateSelectedOption(val: any): void {
-        this.selectedOption = this.findOption(val, this.optionsToDisplay);
+        const option = this.findOption(val, this.optionsToDisplay);
+        // in case of lazy, selected option might be not found in the visible part, in that case:
+        // - if val is defined we trust the user to provide a valid value present in options (or init filterValue and loadOnInit)
+        // - or keep previous select item if val didn't change
+        if (this.lazy && !option) {
+            //  if val changed
+            if(!(this.selectedOption && ObjectUtils.equals(val, this.selectedOption.value, this.dataKey))) {
+                this.selectedOption = val ? {label: 'selected', value: val} : undefined;
+            }
+        } else {
+            // the "!lazy" makes sure that when options are reloaded on lazy load event if options are not found any more we keep them
+            this.selectedOption = option;
+        }
         if (this.autoDisplayFirst && !this.placeholder && !this.selectedOption && this.optionsToDisplay && this.optionsToDisplay.length && !this.editable) {
             this.selectedOption = this.optionsToDisplay[0];
         }
@@ -587,6 +626,7 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
             originalEvent: event,
             value: this.value
         });
+        // we could make editable work with lazy loading but it will just be a waste of time IMHO, a better component for that would be autocomplete
     }
 
     show() {
@@ -793,7 +833,7 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
                 else {
                     if (this.group) {
                         let selectedItemIndex = this.selectedOption ? this.findOptionGroupIndex(this.getOptionValue(this.selectedOption), this.optionsToDisplay) : -1;
-                        
+
                         if (selectedItemIndex !== -1) {
                             let nextItemIndex = selectedItemIndex.itemIndex + 1;
                             if (nextItemIndex < (this.getOptionGroupChildren(this.optionsToDisplay[selectedItemIndex.groupIndex]).length)) {
@@ -855,7 +895,6 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
             break;
 
             //space
-            case 32:
             case 32:
                 if (!this.overlayVisible){
                     this.show();
@@ -1037,6 +1076,9 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
         }
         else {
             this._filterValue = null;
+            if (this.lazy) {
+                this.options = [];
+            }
             this.optionsToDisplay = this.options;
         }
 
@@ -1046,7 +1088,9 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
     activateFilter() {
         let searchFields: string[] = (this.filterBy || this.optionLabel || 'label').split(',');
 
-        if (this.options && this.options.length) {
+        if (this.lazy) {
+            this.lazyLoad();
+        } else if (this.options && this.options.length) {
             if (this.group) {
                 let filteredGroups = [];
                 for (let optgroup of this.options) {
@@ -1068,6 +1112,14 @@ export class Dropdown implements OnInit,AfterViewInit,AfterContentInit,AfterView
 
             this.optionsChanged = true;
         }
+    }
+
+    lazyLoad() {
+        this.onLazyLoad.emit({
+            first: 0,
+            rows: this.rows,
+            globalFilter: this.filterValue,
+        });
     }
 
     applyFocus(): void {

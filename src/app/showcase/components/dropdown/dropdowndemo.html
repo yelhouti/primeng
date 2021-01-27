@@ -42,6 +42,14 @@
     
         <h5>Virtual Scroll (10000 Items)</h5>
         <p-dropdown [options]="items" [(ngModel)]="item" placeholder="Select Item" [virtualScroll]="true" [itemSize]="31" [filter]="false"></p-dropdown>
+
+
+        <h5>Lazy Loading</h5>
+        <form>
+            <p-dropdown name="lazy" [lazy]="true" [rows]="20" [options]="lazyItems" [(ngModel)]="selectedLazy" placeholder="Select Item" [showClear]="true"
+                        [filter]="true" [filterValue]="filterValue" (onLazyLoad)="onLazyLoadEvent($event)"></p-dropdown>
+
+        </form>
     </div>
 </div>
 

@@ -52,6 +52,11 @@
                 </div>
             </ng-template>
         </p-multiSelect>
+
+
+        <h5>Lazy Loading</h5>
+        <p-multiSelect [lazy]="true" [lazyLoadOnInit]="true" [lazySelectedOptions]="lazySelectedOptions"  [rows]="10" [options]="lazyItems" [(ngModel)]="selectedItems" [panelStyle]="{minWidth:'12em'}" [virtualScroll]="true" [filter]="true" [itemSize]="34"
+                       (onLazyLoad)="onLazyLoadEvent($event)"></p-multiSelect>
     </div>
 </div>
 
