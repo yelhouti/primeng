@@ -59,6 +59,10 @@ export interface DropdownLazyLoadEvent {
      * Index of the last element in viewport.
      */
     last: number;
+    /**
+     * The current value of the filter.
+     */
+    filter: string | null;
 }
 /**
  * Defines valid templates in Dropdown.
