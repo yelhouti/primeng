@@ -269,7 +269,7 @@ export class MultiSelectItem {
                                 [autoSize]="true"
                                 [tabindex]="-1"
                                 [lazy]="lazy"
-                                (onLazyLoad)="onLazyLoad.emit($event)"
+                                (onLazyLoad)="onScrollerLazyLoadEvent($event)"
                                 [options]="virtualScrollOptions"
                             >
                                 <ng-template pTemplate="content" let-items let-scrollerOptions="options">
@@ -682,6 +682,12 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
         this._options = val;
         this.updateLabel();
     }
+
+    @Input() set lazySelectedOptions(val: any[]) {
+        this._lazySelectedOptions = val || [];
+        this.updateLabel();
+    }
+
     /**
      * When specified, filter displays with this value.
      * @group Props
@@ -691,7 +697,11 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
     }
     set filterValue(val: string | undefined | null) {
         this._filterValue = val;
-        this.activateFilter();
+        if (this.lazy) {
+            this.onLazyLoad.emit({ first: 0, last: 20, filter: this._filterValue });
+        } else {
+            this.activateFilter();
+        }
     }
     /**
      * Item size of item to be virtual scrolled.
@@ -849,6 +859,9 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
     filterOptions: MultiSelectFilterOptions | undefined;
 
     _options: any[] | undefined;
+
+    // this is used when the lazy to keep a reference of the option when it is not present anymore in the list of options (to compute the label...)
+    _lazySelectedOptions: any[] = [];
 
     maxSelectionLimitReached: boolean | undefined;
 
@@ -1080,7 +1093,7 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
 
         let allChecked = this.allChecked;
 
-        if (allChecked) this.uncheckAll();
+        if (allChecked || this.lazy) this.uncheckAll();
         else this.checkAll();
 
         this.onModelChange(this.value);
@@ -1121,7 +1134,7 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
         let optionsToRender = this.optionsToRender;
         let val: any[] = [];
 
-        optionsToRender.forEach((opt) => {
+        [...optionsToRender, ...this._lazySelectedOptions].forEach((opt) => {
             if (!this.group) {
                 let optionDisabled = this.isOptionDisabled(opt);
                 if (optionDisabled && this.isSelected(opt)) {
@@ -1287,6 +1300,10 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
         }
     }
 
+    onScrollerLazyLoadEvent(event) {
+        this.onLazyLoad.emit({ ...event, filter: this._filterValue });
+    }
+
     findNextItem(item: any): HTMLElement | null {
         let nextItem = item.nextElementSibling;
 
@@ -1327,7 +1344,7 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
     }
 
     updateLabel() {
-        if (this.value && this.options && this.value.length && this.displaySelectedLabel) {
+        if (this.value && (this.options || this._lazySelectedOptions) && this.value.length && this.displaySelectedLabel) {
             let label = '';
             for (let i = 0; i < this.value.length; i++) {
                 let itemLabel = this.findLabelByValue(this.value[i]);
@@ -1377,6 +1394,9 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
 
     searchLabelByValue(val: any, options: any[]): string {
         let label = null;
+        if (this.lazy) {
+            options = [...(options || []), ...this._lazySelectedOptions];
+        }
 
         for (let i = 0; i < options.length; i++) {
             let option = options[i];
@@ -1384,6 +1404,9 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
 
             if ((val == null && optionValue == null) || ObjectUtils.equals(val, optionValue, this.dataKey)) {
                 label = this.getOptionLabel(option);
+                if (this.lazy && !this._lazySelectedOptions.some((o) => ObjectUtils.equals(this.getOptionValue(option), this.getOptionValue(o), this.dataKey))) {
+                    this._lazySelectedOptions.push(option);
+                }
                 break;
             }
         }
@@ -1461,7 +1484,11 @@ export class MultiSelect implements OnInit, AfterViewInit, AfterContentInit, Aft
 
     onFilterInputChange(event: KeyboardEvent) {
         this._filterValue = (<HTMLInputElement>event.target).value;
-        this.activateFilter();
+        if (this.lazy) {
+            this.onLazyLoad.emit({ first: 0, last: 20, filter: this._filterValue });
+        } else {
+            this.activateFilter();
+        }
         this.onFilter.emit({ originalEvent: event, filter: this._filterValue });
         this.cd.detectChanges();
     }
