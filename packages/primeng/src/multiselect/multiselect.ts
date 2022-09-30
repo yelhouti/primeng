@@ -791,6 +791,13 @@ export class MultiSelect extends BaseEditableHolder<MultiSelectPassThrough> {
         this._filterValue.set(val);
     }
     /**
+     * Selected options to display when using lazy loading. Used to keep a reference of selected options when they are not present in the current options list.
+     * @group Props
+     */
+    @Input() set lazySelectedOptions(val: any[]) {
+        this._lazySelectedOptions = val || [];
+    }
+    /**
      * Whether all data is selected.
      * @group Props
      */
@@ -1219,6 +1226,9 @@ export class MultiSelect extends BaseEditableHolder<MultiSelectPassThrough> {
 
     clickInProgress: boolean = false;
 
+    // Used when lazy loading to keep a reference of selected options when they are not present in the current options list
+    _lazySelectedOptions: any[] = [];
+
     get emptyMessageLabel(): string {
         return this.emptyMessage || this.config.getTranslation(TranslationKeys.EMPTY_MESSAGE);
     }
@@ -1240,7 +1250,11 @@ export class MultiSelect extends BaseEditableHolder<MultiSelectPassThrough> {
     }
 
     private getAllVisibleAndNonVisibleOptions() {
-        return this.group ? this.flatOptions(this.options) : this.options || [];
+        const options = this.group ? this.flatOptions(this.options) : this.options || [];
+        if (this.lazy) {
+            return [...options, ...this._lazySelectedOptions];
+        }
+        return options;
     }
 
     visibleOptions = computed(() => {
@@ -1556,8 +1570,14 @@ export class MultiSelect extends BaseEditableHolder<MultiSelectPassThrough> {
     }
 
     getLabelByValue(value) {
-        const options = this.group ? this.flatOptions(this._options()) : this._options() || [];
+        let options = this.group ? this.flatOptions(this._options()) : this._options() || [];
+        if (this.lazy) {
+            options = [...options, ...this._lazySelectedOptions];
+        }
         const matchedOption = options.find((option) => !this.isOptionGroup(option) && equals(this.getOptionValue(option), value, this.equalityKey() || ''));
+        if (matchedOption && this.lazy && !this._lazySelectedOptions.some((o) => equals(this.getOptionValue(matchedOption), this.getOptionValue(o), this.dataKey))) {
+            this._lazySelectedOptions.push(matchedOption);
+        }
         return matchedOption ? this.getOptionLabel(matchedOption) : null;
     }
 
