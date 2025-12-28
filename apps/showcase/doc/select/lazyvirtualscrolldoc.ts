@@ -1,6 +1,6 @@
 import { AppCode } from '@/components/doc/app.code';
 import { Code } from '@/domain/code';
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ScrollerOptions, SelectItem } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
@@ -11,35 +11,22 @@ import { SelectModule } from 'primeng/select';
     imports: [AppCode, FormsModule, SelectModule],
     template: `
         <div class="card flex justify-center">
-            <p-select [options]="items" [(ngModel)]="selectedItem" placeholder="Select Item" [virtualScroll]="true" [virtualScrollItemSize]="32" [virtualScrollOptions]="options" class="w-full md:w-56" />
+            <p-select [options]="items()" [(ngModel)]="selectedItem" placeholder="Select Item" [virtualScroll]="true" [virtualScrollItemSize]="32" [lazy]="true" (onLazyLoad)="onLazyLoad($event)" [loading]="loading()" class="w-full md:w-56" />
         </div>
         <app-code [code]="code" selector="select-lazy-virtualscroll-demo"></app-code>
     `
 })
 export class LazyVirtualScrollDoc {
-    items: SelectItem[];
+    items = signal<SelectItem[]>([]);
 
     selectedItem: string | undefined;
 
-    loading: boolean = false;
+    loading = signal<boolean>(false);
 
     loadLazyTimeout = null;
 
-    options: ScrollerOptions = {
-        delay: 250,
-        showLoader: true,
-        lazy: true,
-        onLazyLoad: this.onLazyLoad.bind(this)
-    };
-
-    constructor() {
-        this.items = [];
-        for (let i = 0; i < 10000; i++) {
-            this.items.push({ label: 'Item ' + i, value: 'Item ' + i });
-        }
-    }
     onLazyLoad(event) {
-        this.loading = true;
+        this.loading.set(true);
 
         if (this.loadLazyTimeout) {
             clearTimeout(this.loadLazyTimeout);
@@ -48,29 +35,29 @@ export class LazyVirtualScrollDoc {
         //imitate delay of a backend call
         this.loadLazyTimeout = setTimeout(
             () => {
-                const { first, last } = event;
-                const items = [...this.items];
+                let { first, last } = event;
+                const items = this.items()?.length ? [...this.items()] : (Array.from({ length: 10000 }) as SelectItem[]);
 
                 for (let i = first; i < last; i++) {
                     items[i] = { label: `Item #${i}`, value: i };
                 }
 
-                this.items = items;
-                this.loading = false;
+                this.items.set(items);
+                this.loading.set(false);
             },
             Math.random() * 1000 + 250
         );
     }
 
     code: Code = {
-        basic: `<p-select [options]="items" [(ngModel)]="selectedItem" placeholder="Select Item" [virtualScroll]="true" [virtualScrollItemSize]="32" [virtualScrollOptions]="options" class="w-full md:w-56" />`,
+        basic: `<p-select [options]="items()" [(ngModel)]="selectedItem" placeholder="Select Item" [virtualScroll]="true" [virtualScrollItemSize]="32" [lazy]="true" (onLazyLoad)="onLazyLoad($event)" [loading]="loading()" class="w-full md:w-56" />`,
 
         html: `<div class="card flex justify-center">
-    <p-select [options]="items" [(ngModel)]="selectedItem" placeholder="Select Item" [virtualScroll]="true" [virtualScrollItemSize]="32" [virtualScrollOptions]="options" class="w-full md:w-56" />
+    <p-select [options]="items()" [(ngModel)]="selectedItem" placeholder="Select Item" [virtualScroll]="true" [virtualScrollItemSize]="32" [lazy]="true" (onLazyLoad)="onLazyLoad($event)" [loading]="loading()" class="w-full md:w-56" />
 </div>`,
 
         typescript: `import { SelectItem } from 'primeng/api';
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Select } from 'primeng/select';
 
@@ -81,29 +68,16 @@ import { Select } from 'primeng/select';
     imports: [FormsModule, Select]
 })
 export class SelectLazyVirtualscrollDemo {
-    items: SelectItem[];
+    items = signal<SelectItem[]>([]);
 
     selectedItem: string | undefined;
 
-    loading: boolean = false;
+    loading = signal<boolean>(false);
 
     loadLazyTimeout = null;
 
-    options: ScrollerOptions = {
-        delay: 250,
-        showLoader: true,
-        lazy: true,
-        onLazyLoad: this.onLazyLoad.bind(this)
-    };
-
-    constructor() {
-        this.items = [];
-        for (let i = 0; i < 10000; i++) {
-            this.items.push({ label: 'Item ' + i, value: 'Item ' + i });
-        }
-    }
     onLazyLoad(event) {
-        this.loading = true;
+        this.loading.set(true);
 
         if (this.loadLazyTimeout) {
             clearTimeout(this.loadLazyTimeout);
@@ -111,18 +85,17 @@ export class SelectLazyVirtualscrollDemo {
 
         //imitate delay of a backend call
         this.loadLazyTimeout = setTimeout(() => {
-            const { first, last } = event;
-            const items = [...this.items];
+            let { first, last } = event;
+            const items = this.items()?.length ? [...this.items()] : Array.from({ length: 10000 }) as SelectItem[];
 
             for (let i = first; i < last; i++) {
                 items[i] = { label: \`Item #\${i}\`, value: i };
             }
 
-            this.items = items;
-            this.loading = false;
+            this.items.set(items);
+            this.loading.set(false);
         }, Math.random() * 1000 + 250);
     }
-
 }`
     };
 }
