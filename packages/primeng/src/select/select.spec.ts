@@ -4523,4 +4523,17 @@ describe('Lazy Virtual Scroll', () => {
         const scroller = fixture.debugElement.query(By.css('p-scroller'));
         expect(scroller.nativeElement.offsetHeight).toBeGreaterThan(100);
     });
+
+    it('should request a page of options, not a pixel height, when the filter changes', async () => {
+        const lazyLoadSpy = spyOn(component, 'onLazyLoad').and.callThrough();
+
+        selectInstance.filterValue = 'Loan';
+        // the filterValue setter defers the signal update to a macrotask
+        await new Promise((resolve) => setTimeout(resolve));
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        // 200px viewport / 32px per option = 7 options, doubled for the scroller tolerance
+        expect(lazyLoadSpy).toHaveBeenCalledWith({ first: 0, last: 14, filter: 'Loan' });
+    });
 });

@@ -353,6 +353,7 @@ class TestVirtualScrollMultiSelectComponent {
     options: City[] = [];
     selectedCities: City[] = [];
     lazy = false;
+    lazyLoadEvent: any;
 
     constructor() {
         // Generate large dataset for virtual scrolling
@@ -365,10 +366,7 @@ class TestVirtualScrollMultiSelectComponent {
     }
 
     onLazyLoad(event: any) {
-        // Simulate lazy loading
-        const start = event.first;
-        const end = event.first + event.rows;
-        // Load items from start to end
+        this.lazyLoadEvent = event;
     }
 }
 
@@ -986,6 +984,16 @@ describe('MultiSelect', () => {
             const emptyMessage = fixture.debugElement.query(By.css('.p-multiselect-empty-message'));
             expect(emptyMessage).toBeTruthy();
             expect(emptyMessage.nativeElement.textContent.trim()).toBe('No results found');
+        });
+
+        it('should request a default page of options when lazy and the viewport cannot be measured', async () => {
+            component.lazy = true;
+            fixture.changeDetectorRef.markForCheck();
+            await fixture.whenStable();
+
+            multiSelect.onFilterInputChange({ target: { value: 'New' } } as any);
+
+            expect(component.lazyLoadEvent).toEqual({ first: 0, last: 20, filter: 'New' });
         });
 
         it('should handle filter keydown events', async () => {
@@ -1701,6 +1709,51 @@ describe('MultiSelect Virtual Scrolling', () => {
 
             expect(component.onLazyLoad).toHaveBeenCalled();
         }
+    });
+
+    it('should include the current filter in the lazy load events emitted by the scroller', async () => {
+        component.lazy = true;
+        fixture.detectChanges();
+
+        multiSelect.show();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        multiSelect.filterValue = 'Loan';
+        fixture.detectChanges();
+
+        expect(multiSelect.scroller).toBeTruthy();
+        multiSelect.scroller!.onLazyLoad.emit({ first: 0, last: 10 });
+
+        expect(component.lazyLoadEvent).toEqual({ first: 0, last: 10, filter: 'Loan' });
+    });
+
+    it('should emit a null filter in the lazy load events emitted by the scroller when nothing is typed', async () => {
+        component.lazy = true;
+        fixture.detectChanges();
+
+        multiSelect.show();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        expect(multiSelect.scroller).toBeTruthy();
+        multiSelect.scroller!.onLazyLoad.emit({ first: 0, last: 10 });
+
+        expect(component.lazyLoadEvent).toEqual({ first: 0, last: 10, filter: null });
+    });
+
+    it('should request a page of options, not a pixel height, when the filter changes', async () => {
+        component.lazy = true;
+        fixture.detectChanges();
+
+        multiSelect.show();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        multiSelect.onFilterInputChange({ target: { value: 'City 1' } } as any);
+
+        // 200px viewport / 40px per option = 5 options, doubled for the scroller tolerance
+        expect(component.lazyLoadEvent).toEqual({ first: 0, last: 10, filter: 'City 1' });
     });
 
     it('should scroll to selected item', async () => {
