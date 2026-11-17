@@ -6207,7 +6207,10 @@ export class ColumnFilter extends BaseComponent {
             if (this.type === 'text') return FilterMatchMode.STARTS_WITH;
             else if (this.type === 'numeric') return FilterMatchMode.EQUALS;
             else if (this.type === 'date') return FilterMatchMode.DATE_IS;
-            else return FilterMatchMode.CONTAINS;
+            // a custom type (e.g. 'dateTime' declared in providePrimeNG's filterMatchModeOptions) starts on its first
+            // configured match mode: CONTAINS is not among its options, and the filter would send a mode it does not offer
+            const configured = this.matchModeOptions?.[0]?.value ?? (this.config as any).filterMatchModeOptions?.[<string>this.type]?.[0];
+            return configured ?? FilterMatchMode.CONTAINS;
         }
     }
 
